@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
@@ -15,11 +16,14 @@ class ScreenClient extends StatefulWidget {
 }
 
 class _ScreenClientState extends State<ScreenClient> {
-  TextEditingController _ipController = TextEditingController();
-  TextEditingController _portController = TextEditingController();
+  final TextEditingController _ipController = TextEditingController();
+  final TextEditingController _portController = TextEditingController();
+  final TextEditingController _contentController = TextEditingController();
   bool _isClientConnected = false;
   String _receivedMessage = '';
   Socket? _socket;
+
+  StreamSubscription? _socketSub;
 
   @override
   void initState() {
@@ -30,6 +34,7 @@ class _ScreenClientState extends State<ScreenClient> {
 
   @override
   void dispose() {
+    _socketSub?.cancel();
     _ipController.dispose();
     _portController.dispose();
     WakelockPlus.disable();
@@ -103,15 +108,20 @@ class _ScreenClientState extends State<ScreenClient> {
                   if (_isClientConnected)
                     Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: TextField(
-                              decoration: InputDecoration(
+                            controller: _contentController,
+                              decoration: const InputDecoration(
                             labelText: 'Message',
                             hintText: 'Message',
                           )),
                         ),
                         IconButton(
-                          onPressed: () {},
+                          onPressed: () {
+                            var content = _contentController.text;
+                            _socket?.write(content);
+                            _contentController.clear();
+                          },
                           icon: const Icon(Icons.send),
                         ),
                       ],
@@ -148,9 +158,9 @@ class _ScreenClientState extends State<ScreenClient> {
         _isClientConnected = true;
         WakelockPlus.enable();
       });
-      socket.listen((event) {
+      _socketSub = socket.listen((event) {
         setState(() {
-          _receivedMessage = String.fromCharCodes(event).trim();
+          _receivedMessage += String.fromCharCodes(event).trim() + '\n';
         });
       })
         ..onDone(() {
