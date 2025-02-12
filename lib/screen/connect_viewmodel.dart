@@ -7,21 +7,25 @@ class ConnectViewModel{
   ConnectViewModel._();
 
   Future<bool> connectWifi(String ssid, String password, NetworkSecurity security) async {
+
     var success = await WiFiForIoTPlugin.connect(
       ssid,
       password: password,
-      joinOnce: true,
+      joinOnce: false,
       withInternet: false,
       security: security,
       timeoutInSeconds: 10,
     ).onError((error, stackTrace) {
+      print('Error: $error');
       Fluttertoast.showToast(msg: error.toString());
       return false;
     });
+    WiFiForIoTPlugin.forceWifiUsage(true);
     return success;
   }
 
   disconnectWifi() async {
+    WiFiForIoTPlugin.forceWifiUsage(false);
     await WiFiForIoTPlugin.disconnect();
   }
 }

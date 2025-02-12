@@ -98,7 +98,7 @@ class _ScreenConnectState extends State<ScreenConnect> {
   }
 
   void connect() async {
-    var ssid = ssidController.text;
+    var ssid = ssidController.text.trim();
     var password = passwordController.text;
 
     // Save to preferences

@@ -11,15 +11,7 @@ class ScreenTransaction extends StatefulWidget {
 }
 
 class _ScreenTransactionState extends State<ScreenTransaction> {
-  TextEditingController ipController = TextEditingController();
-  TextEditingController portController = TextEditingController();
 
-  @override
-  void initState() {
-    ipController.text = '192.168.4.1';
-    portController.text = '8360';
-    super.initState();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,9 +40,4 @@ class _ScreenTransactionState extends State<ScreenTransaction> {
     );
   }
 
-  @override
-  void dispose() {
-    ConnectViewModel.get().disconnectWifi();
-    super.dispose();
-  }
 }

@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:network_info_plus/network_info_plus.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 class ScreenServer extends StatefulWidget {
   const ScreenServer({super.key});
@@ -14,9 +16,11 @@ class _ScreenServerState extends State<ScreenServer> {
   TextEditingController _ipController = TextEditingController();
   TextEditingController _portController = TextEditingController();
   bool _isServerCreated = false;
+  bool _isClientConnected = false;
   String _receivedMessage = '';
   ServerSocket? _serverSocket;
   Socket? _socket;
+  String _ipList = '';
 
   @override
   void initState() {
@@ -24,6 +28,15 @@ class _ScreenServerState extends State<ScreenServer> {
     _ipController.text = address;
     _portController.text = '8360';
     super.initState();
+  }
+
+  @override
+  void dispose() {
+    _ipController.dispose();
+    _portController.dispose();
+    stopServer();
+    WakelockPlus.disable();
+    super.dispose();
   }
 
   @override
@@ -38,6 +51,7 @@ class _ScreenServerState extends State<ScreenServer> {
               children: [
                 const Text('Server', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),),
                 Text(_isServerCreated ? 'Started': 'Stopped', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _isServerCreated ? Colors.green : Colors.red),),
+                if(_isClientConnected) Text('Client connected', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green),),
                 TextField(
                   controller: _ipController,
                   decoration: const InputDecoration(
@@ -50,6 +64,7 @@ class _ScreenServerState extends State<ScreenServer> {
                     labelText: 'Port',
                     hintText: 'Port',)
                 ),
+                Text(_ipList),
                 ElevatedButton(
                   onPressed: () {
                     if(_isServerCreated) {
@@ -89,10 +104,28 @@ class _ScreenServerState extends State<ScreenServer> {
     );
   }
 
-  void startServer() {
+  void startServer() async{
     int port = int.tryParse(_portController.text.toString()) ?? 8360;
-    ServerSocket.bind(InternetAddress.anyIPv4, port).then((serverSocket) {
+
+    // var internetAddr = InternetAddress.tryParse(ip);
+    // debugPrint('Starting server at ${ip!.address}:$port');
+    ServerSocket.bind(InternetAddress.anyIPv4, port).then((serverSocket) async{
       _serverSocket = serverSocket;
+      String? ip = await NetworkInfo().getWifiIP();
+      _ipList = '';
+      NetworkInterface.list(type: InternetAddressType.IPv4).then((value) {
+        value.forEach((element) {
+          debugPrint('name: ${element.name}, address: ${element.addresses}');
+          _ipList += '${element.name}: ${element.addresses}\n';
+        });
+        setState(() {});
+      });
+
+      setState(() {
+        _isServerCreated = true;
+        WakelockPlus.enable();
+      });
+
       serverSocket.listen((socket) {
         _socket = socket;
         socket.listen((data) {
@@ -100,10 +133,17 @@ class _ScreenServerState extends State<ScreenServer> {
             _receivedMessage = String.fromCharCodes(data).trim();
           });
         });
+        setState(() {
+          _receivedMessage = 'Client connected';
+          _isClientConnected = true;
+        });
+
+      })..onDone(() {
+        stopServer();
+      })..onError((error, stackTrace) {
+        Fluttertoast.showToast(msg: error.toString());
       });
-      setState(() {
-        _isServerCreated = true;
-      });
+
     }).onError((error, stackTrace) {
       Fluttertoast.showToast(msg: error.toString());
       stopServer();
