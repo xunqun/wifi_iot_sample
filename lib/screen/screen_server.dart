@@ -13,8 +13,8 @@ class ScreenServer extends StatefulWidget {
 }
 
 class _ScreenServerState extends State<ScreenServer> {
-  TextEditingController _ipController = TextEditingController();
   TextEditingController _portController = TextEditingController();
+  TextEditingController _inputController = TextEditingController();
   bool _isServerCreated = false;
   bool _isClientConnected = false;
   String _receivedMessage = '';
@@ -24,15 +24,12 @@ class _ScreenServerState extends State<ScreenServer> {
 
   @override
   void initState() {
-    var address = '192.168.4.1';
-    _ipController.text = address;
     _portController.text = '8360';
     super.initState();
   }
 
   @override
   void dispose() {
-    _ipController.dispose();
     _portController.dispose();
     stopServer();
     WakelockPlus.disable();
@@ -47,56 +44,59 @@ class _ScreenServerState extends State<ScreenServer> {
           padding: const EdgeInsets.all(16.0),
           child: Container(
             width: double.infinity,
-            child: Column(
+            child: Stack(
               children: [
-                const Text('Server', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),),
-                Text(_isServerCreated ? 'Started': 'Stopped', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _isServerCreated ? Colors.green : Colors.red),),
-                if(_isClientConnected) Text('Client connected', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green),),
-                TextField(
-                  controller: _ipController,
-                  decoration: const InputDecoration(
-                    labelText: 'IP Address',
-                    hintText: 'IP Address',)
-                ),
-                TextField(
-                  controller: _portController,
-                  decoration: const InputDecoration(
-                    labelText: 'Port',
-                    hintText: 'Port',)
-                ),
-                Text(_ipList),
-                ElevatedButton(
-                  onPressed: () {
-                    if(_isServerCreated) {
-                      stopServer();
-                    } else {
-                      startServer();
-                    }
-                  },
-                  child: Text(_isServerCreated ? 'Stop Server' : 'Start Server'),
-                ),
+                IconButton(onPressed: (){
+                  stopServer();
+                  Navigator.popUntil(context, (route) => route.isFirst);
+                }, icon: const Icon(Icons.close)),
+                Column(
+                children: [
+                  const Text('I\'m Server', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),),
+                  Text(_isServerCreated ? 'Started': 'Stopped', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _isServerCreated ? Colors.green : Colors.red),),
+                  TextField(
+                    controller: _portController,
+                    decoration: const InputDecoration(
+                      labelText: 'Port',
+                      hintText: 'Port',)
+                  ),
+                  Text(_ipList, style: TextStyle(fontSize: 12, color: Colors.blueGrey),),
+                  ElevatedButton(
+                    onPressed: () {
+                      if(_isServerCreated) {
+                        stopServer();
+                      } else {
+                        startServer();
+                      }
+                    },
+                    child: Text(_isServerCreated ? 'Stop Server' : 'Start Server'),
+                  ),
 
-                // message received log
-                const SizedBox(height: 48,),
-                if(_isServerCreated) Expanded(
-                  child: Align(alignment: Alignment.topLeft, child: Text(_receivedMessage, style: const TextStyle(fontSize: 12),)),
-                ),
-                if(_isServerCreated) Row(
-                  children: [
-                    const Expanded(
-                      child: TextField(
-                          decoration: InputDecoration(
-                            labelText: 'Message',
-                            hintText: 'Message',)
+                  // message received log
+                  const SizedBox(height: 48,),
+                  if(_isServerCreated) Expanded(
+                    child: Align(alignment: Alignment.topLeft, child: Text(_receivedMessage, style: const TextStyle(fontSize: 12),)),
+                  ),
+                  if(_isServerCreated) Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                            controller: _inputController,
+                            decoration: const InputDecoration(
+                              labelText: 'Message',
+                              hintText: 'Message',)
+                        ),
                       ),
-                    ),
-                    IconButton(
-                      onPressed: () {},
-                      icon: const Icon(Icons.send),
-                    ),
-                  ],
-                )
-              ],
+                      IconButton(
+                        onPressed: () {
+                          _socket?.write(_inputController.text);
+                        },
+                        icon: const Icon(Icons.send),
+                      ),
+                    ],
+                  )
+                ],
+              ),]
             ),
           ),
         ),
@@ -142,10 +142,12 @@ class _ScreenServerState extends State<ScreenServer> {
         stopServer();
       })..onError((error, stackTrace) {
         Fluttertoast.showToast(msg: error.toString());
+        debugPrint('Error: ${error.toString()}');
       });
 
     }).onError((error, stackTrace) {
       Fluttertoast.showToast(msg: error.toString());
+      debugPrint('Error: ${error.toString()}');
       stopServer();
     });
 
@@ -156,6 +158,7 @@ class _ScreenServerState extends State<ScreenServer> {
     _serverSocket?.close();
     _socket?.close();
     setState(() {
+      _receivedMessage = '';
       _isServerCreated = false;
     });
   }

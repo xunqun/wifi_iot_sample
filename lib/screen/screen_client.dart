@@ -20,6 +20,7 @@ class _ScreenClientState extends State<ScreenClient> {
   final TextEditingController _portController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
   bool _isClientConnected = false;
+  bool _connecting = false;
   String _receivedMessage = '';
   Socket? _socket;
 
@@ -81,7 +82,7 @@ class _ScreenClientState extends State<ScreenClient> {
                         labelText: 'Port',
                         hintText: 'Port',
                       )),
-                  ElevatedButton(
+                  _connecting ? const CircularProgressIndicator() : ElevatedButton(
                     onPressed: () {
                       if (_isClientConnected) {
                         stopClient();
@@ -155,10 +156,14 @@ class _ScreenClientState extends State<ScreenClient> {
 
   void stopClient() {
     _socket?.destroy();
+
     try {
       if (mounted) {
         setState(() {
+          _receivedMessage = '';
           _isClientConnected = false;
+          _connecting = false;
+
         });
       }
     }catch(e){
@@ -168,16 +173,25 @@ class _ScreenClientState extends State<ScreenClient> {
 
   void startClient() {
     var ip = _ipController.text;
-    var port = int.tryParse(_portController.text);
+    int port = int.tryParse(_portController.text) ?? 8360;
     Preferences.get().ip = ip;
     Preferences.get().port = port.toString();
-    Socket.connect('192.168.4.1', 80, timeout: Duration(seconds: 10)).then((socket) {
+
+    setState(() {
+      _connecting = true;
+    });
+    Socket.connect(ip, port, timeout: Duration(seconds: 10)).then((socket) {
       _socket = socket;
       if (_socket == null) {
+        setState(() {
+          _isClientConnected = false;
+          _connecting = false;
+        });
         return;
       }
       setState(() {
         _isClientConnected = true;
+        _connecting = false;
         WakelockPlus.enable();
       });
       _socketSub = socket.listen((event) {
@@ -191,11 +205,12 @@ class _ScreenClientState extends State<ScreenClient> {
         ..onDone(() {
           setState(() {
             _isClientConnected = false;
+            _connecting = false;
           });
           socket.destroy();
         })
         ..onError((error, stackTrace) {
-          print('Error: $error');
+          debugPrint('Error: $error');
         })
         ..onData((data) {
           setState(() {
@@ -205,10 +220,11 @@ class _ScreenClientState extends State<ScreenClient> {
           print('Data: $data');
         });
     }).onError((error, stackTrace) {
-      print('Error: $error');
+      debugPrint('Error: ${error.toString()}');
       Fluttertoast.showToast(msg: error.toString());
       setState(() {
         _isClientConnected = false;
+        _connecting = false;
       });
     });
     //write ascii /r/n to server
