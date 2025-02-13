@@ -34,11 +34,11 @@ class _ScreenClientState extends State<ScreenClient> {
 
   @override
   void dispose() {
+    stopClient();
     _socketSub?.cancel();
     _ipController.dispose();
     _portController.dispose();
     WakelockPlus.disable();
-    stopClient();
     ConnectViewModel.get().disconnectWifi();
     super.dispose();
   }
@@ -96,14 +96,32 @@ class _ScreenClientState extends State<ScreenClient> {
                   const SizedBox(
                     height: 48,
                   ),
+                  if (_isClientConnected)Row(
+                    children: [
+                      const Text(
+                        'Message Received',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      IconButton(
+                        onPressed: () {
+                          setState(() {
+                            _receivedMessage = '';
+                          });
+                        },
+                        icon: const Icon(Icons.cleaning_services),
+                      ),
+                    ],
+                  ),
                   if (_isClientConnected)
                     Expanded(
-                      child: Align(
-                          alignment: Alignment.topLeft,
-                          child: Text(
-                            _receivedMessage,
-                            style: const TextStyle(fontSize: 12),
-                          )),
+                      child: SingleChildScrollView(
+                        child: Align(
+                            alignment: Alignment.topLeft,
+                            child: Text(
+                              _receivedMessage,
+                              style: const TextStyle(fontSize: 12),
+                            )),
+                      ),
                     ),
                   if (_isClientConnected)
                     Row(
@@ -119,7 +137,7 @@ class _ScreenClientState extends State<ScreenClient> {
                         IconButton(
                           onPressed: () {
                             var content = _contentController.text;
-                            _socket?.write(content);
+                            _socket?.write(content+String.fromCharCode(0x0A)+String.fromCharCode(0x0D));
                             _contentController.clear();
                           },
                           icon: const Icon(Icons.send),
@@ -137,10 +155,14 @@ class _ScreenClientState extends State<ScreenClient> {
 
   void stopClient() {
     _socket?.destroy();
-    if(mounted) {
-      setState(() {
-        _isClientConnected = false;
-      });
+    try {
+      if (mounted) {
+        setState(() {
+          _isClientConnected = false;
+        });
+      }
+    }catch(e){
+      print('Error: $e');
     }
   }
 
@@ -160,7 +182,10 @@ class _ScreenClientState extends State<ScreenClient> {
       });
       _socketSub = socket.listen((event) {
         setState(() {
-          _receivedMessage += String.fromCharCodes(event).trim() + '\n';
+          // _receivedMessage += String.fromCharCodes(event).trim() + '\n';
+          // to hex code
+          _receivedMessage += event.map((e) => e.toRadixString(16).padLeft(2, '0')).join(' ');
+
         });
       })
         ..onDone(() {
@@ -174,7 +199,7 @@ class _ScreenClientState extends State<ScreenClient> {
         })
         ..onData((data) {
           setState(() {
-            _receivedMessage = String.fromCharCodes(data).trim();
+            _receivedMessage += String.fromCharCodes(data).trim();
           });
 
           print('Data: $data');
@@ -186,5 +211,7 @@ class _ScreenClientState extends State<ScreenClient> {
         _isClientConnected = false;
       });
     });
+    //write ascii /r/n to server
+    _socket?.write(String.fromCharCode(0x0A)+String.fromCharCode(0x0D));
   }
 }
